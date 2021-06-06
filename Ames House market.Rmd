@@ -1,0 +1,892 @@
+---
+output:
+  word_document: default
+  html_document: default
+---
+---
+title: "AMES House market report"
+author: "Xieyuan Huang U3190995"
+Note: The data will be imported by selecting csv file. The first one is for train.csv and the second one is for test.csv
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(error = TRUE)
+
+```
+
+```{r}
+install.packages("rmarkdown")
+install.packages("Tidyverse")
+install.packages("Metrics")
+install.packages("GGally")
+library(knitr)
+library(tidyverse)
+library(Metrics)
+library(GGally)
+```
+# Abstract
+In this report, I am aiming to to provide an insights of Ames city housing market and then provide a solid model for predicting the sale price by analysising the dataset with research and data support. The report starts from conducting deep background research and future policy of the housing market from the government of Ames city. Then, I identified 5 variables on neighborhood, living areas, overall quality, sale condition and house style that are interested and valuable to investigate. After that, Cleaning the dataset was performed by finding the best treatment for each variables instead of just deleting them. In the EDA section, I used barplot, histogram, heat map, scatterplot plot matrix, scatter plot, box plot, violin plot and jitter points with introducing different color and smooths to explain the defined problems. To construct a reliable model, the first model was created by the top five numeric variables with highest correlation with the sale price. The second model was created by the five selected variables. The third model was created by the combination of the first model's variables and the second model's. In conclusion, the best result reaches the R squared value 0.845 which provides a solid model for investor to invest and investment suggestion were stated at the end of the report. The future improvement and work also stated at the end of the report.
+
+
+# Problem Identification
+
+In order to conduct a high quality exploratory data analysis, understand the housing market and the nature of Ames are necessary.
+
+The housing market refers to the supply and demand for houses in a typical region. The one of the most important elements of the housing market is the average house prices and trend. 
+
+There are 66,023 population in Ames, Iowa. It is regarded as one of the lowest unemployment rate among the US. According to the Ames Plan 2040 conducted by Ames city council, it estimates that 6,400 housing needs to be built with an average size 2.3 people so that it can match the estimated population growth about 15,000.
+According to the survey provided by the coucil, there are 67% of residents believe that more housing options can enhance there life quality in the next 20 years. The summarized principles have been defined as following: 
+  Expand housing choice and attainability for people of all income ranges.
+  Maintain the quality of existing neighborhoods while also encouraging reinvestment and enhancement of existing housing stock. 
+  Advance identification and redevelopment of redirection areas.
+Those three policies have been decomposed with detail policies. More information and discusstion will be taken in the later sections.
+
+Overall, the housing market in Ames city has become important and in demand. In this report, I am aiming to extract the insights and patterns for all investers who are interested in the housing market in Ames city. There are five questions that the report mainly focuses on building the model. 
+
+  First, Identify which suburb/location had the biggest SalePrice by plotting and examining the sale prices cross different suburbs
+  Second, identify the relation between GrLivArea against sales price
+  Third, Identify whether there is a corralation between OverallQual and SalePrice?
+  Fourth, Identify whether there is a corralation between SaleCondition  and SalePrice?
+  Fifth, Identify whether there is a corralation between HouseStyle and SalePrice?
+
+The annswers of those questions will be covered in the later part.
+
+# Date processing
+
+First of all, import the "train" data for eda analysis.
+As we can see from the graph, there are 81 columns in the dataframe and 1460 rows.
+The first 6 rows of data are displayed.
+```{r}
+df= read.csv(file.choose(), header=TRUE) #Import data to df
+dim(df) #Display the dimension of the data
+```
+Second, checking the Na value in the dataset
+According to the graph, the variables with Na value are LotFrontage(259), Alley(1369), MasVnrType(8), MasVnrArea(8), BsmtQual(37), BsmtCond(37), BsmtExposure(38), BsmtFinType1(37), BsmtFinType2(38), Electrical(1), FireplaceQu(690), GarageType(81), GarageYrBlt(81), GarageFinish(81), PoolQC(1453),  Fence(1179) and MiscFeature(1406).
+
+It will not be a good idea to remove all Na value in this dataset since some of the Na values do not represent missing value in the scenarios. Thus, the missing values should be either replaced by the mean for the numeric variables, the suitable variables for categorical variables or the whole rows should be removed. Here are the analysis and treatment for the Na values of this dataset. Here are the visualization of the number of NA values in different columns
+
+```{r,fig.width=20}
+# Create NA_sum dataframe to store the summary of NA values
+NA_sum= as.data.frame(colSums(is.na(df))) 
+# Process the data to feed the ggplot code
+
+colnames(NA_sum) = "Number"
+NA_sum$Variables= row.names(NA_sum)
+NA_sum = NA_sum %>% filter(NA_sum$Number !=0)
+
+#Display the bar plot of the distribution of NA
+ggplot(NA_sum, aes(x= reorder(Variables, -Number), y=Number))+
+  geom_bar(aes(fill= Variables), stat = "identity")+
+  ylab("Number") +
+  xlab("Columns") + 
+  ggtitle("The number of NA values in all columns") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 18, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 15, hjust= 0.5),
+        axis.title.y = element_text(size= 15, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+
+  LotFrontage(259): According to the description of the dataset from Kaggle, it represents the linear feet of street connected to property, which indicates that this is a numeric variables. The Na value can be considerred as missing values or 0. In this case, I assume those Na values represent 0 feet connected to the street since it is possible that the property just next to the street which means that the linear feet of street connected to property are 0.
+  
+```{r}
+df$LotFrontage[is.na(df$LotFrontage)]=0 #Replace NA with 0
+```
+  
+  Alley(1369): According to the description of the dataset from Kaggle, it represents the type of alley access to property, which indicates that it is a categorical variable. The NA value in here represents "No alley access". They are not a missing value. So, I am going to replace "NO" to all Na values in Alley.
+  
+```{r}
+df$Alley[is.na(df$Alley)]="NO" #Replace NA with "NO"
+```
+  
+  MasVnrType(8): According to the description of the dataset from Kaggle, it represents the masonry veneer type, which indicates that it is a categorical variable. However, the Na values in this column are considered as missing values, not representing no type of alley access to property, because there is a value named "None" to represent no mansonry veneer type. In this case, the best treatment for this column is to remove those observations since we cannot get the average of the categorical data. If we use the most frequent values, it will create an uncertainty and bias for the analysis later on. 8 observations only take 0.5% out of the whole observations, so removing them is reasonable with an extremely small impact for the dataset. Also, MasVnrArea(8) and MasVnrType(8) are in the same observations. If these 8 observations are removed, MasVnrType(8) and MasVnrArea(8) can be addressed at the same time.
+  
+```{r}
+#Instead of removing the rows that contains Na values in MasVnrType, I only pick the data that there is no Na values in MasVnrType. It gets the same result as I expected.
+df=df[!is.na(df$MasVnrType), ]
+```
+As we cans see from the summary of Na values in df, MasVnrType(8) and MasVnrArea(8) got 0 Na values now. So, MasVnrType(8) and MasVnrArea(8) have been addressed at the same time. 
+
+
+BsmtQual(37): According to the description of the dataset from Kaggle, it represents Evaluates the height of the basement, which indicates that it is a categorical variable. Since Na values represent "No Basement" not missing values, the best option to solve this problem is to replace Na values with "No Basement".
+
+```{r}
+df$BsmtQual[is.na(df$BsmtQual)]="No Basement" #Replace NA with "No Basement"
+```
+
+BsmtCond(37): According to the description of the dataset from Kaggle, it represents the evaluates the general condition of the basement, which indicates that it is a categorical variable. Since Na values represent "No Basement" not missing values, the best option to solve this problem is to replace Na values with "No Basement".
+
+```{r}
+df$BsmtCond[is.na(df$BsmtCond)]="No Basement" #Replace NA with "No Basement"
+
+```
+
+BsmtExposure(38): According to the description of the dataset from Kaggle, it represents the refers to walkout or garden level walls, which indicates that it is a categorical variable. Since Na values represent "No Basement" not missing values, the best option to solve this problem is to replace Na values with "No Basement".
+
+```{r}
+df$BsmtExposure[is.na(df$BsmtExposure)]="No Basement" #Replace NA with "No Basement"
+
+```
+
+BsmtFinType1(37): According to the description of the dataset from Kaggle, it represents the rating of basement finished area, which indicates that it is a categorical variable. Since Na values represent "No Basement" not missing values, the best option to solve this problem is to replace Na values with "No Basement".
+
+```{r}
+df$BsmtFinType1[is.na(df$BsmtFinType1)]="No Basement" #Replace NA with "No Basement"
+```
+
+BsmtFinType2(38): According to the description of the dataset from Kaggle, it represents the rating of basement finished area (if multiple types), which indicates that it is a categorical variable. Since Na values represent "No Basement" not missing values, the best option to solve this problem is to replace Na values with "No Basement".
+
+```{r}
+df$BsmtFinType2[is.na(df$BsmtFinType2)]="No Basement" #Replace NA with "No Basement"
+```
+
+Electrical(1): According to the description of the dataset from Kaggle, it represents the electrical system, which indicates that it is a categorical variable. However, there is no description for any Na values, so this one Na value either represents no electric system or an unknown electric system. In order to maintain the integrity of the data, I decide to remove this one observation.
+
+```{r}
+#Instead of removing the rows that contains Na values in Electrical[1]
+df=df[!is.na(df$Electrical), ]
+```
+
+FireplaceQu(690): According to the description of the dataset from Kaggle, it represents the fireplace quality, which indicates that it is a categorical variable. Since Na values represent "No fireplace", not missing values, the best option to solve this problem is to replace Na values with "No fireplace".
+
+```{r}
+df$FireplaceQu[is.na(df$FireplaceQu)]="No Fireplace" #Replace NA with "No Fireplace"
+```
+
+GarageType(81): According to the description of the dataset from Kaggle, it represents the garage location, which indicates that it is a categorical variable. Since Na values represent "No Garage", not missing values, the best option to solve this problem is to replace Na values with "No Garage".
+
+```{r}
+df$GarageType[is.na(df$GarageType)]="No Garage" #Replace NA with "No Garage"
+```
+
+GarageYrBlt(81): According to the description of the dataset from Kaggle, it represents the year garage was built, which indicates that it is a numeric variable. Since Na values represent "No Garage", not missing values, the best option to solve this problem is to replace Na values with zero to represent the fact that there is no garage.  
+
+```{r}
+df$GarageYrBlt[is.na(df$GarageYrBlt)]=0 #Replace NA with zero since this column is integer type
+```
+
+GarageFinish(81): According to the description of the dataset from Kaggle, it represents the interior finish of the garage, which indicates that it is a categorical variable. Since Na values represent "No Garage", not missing values, the best option to solve this problem is to replace Na values with "No Garage".
+
+```{r}
+df$GarageFinish[is.na(df$GarageFinish)]="No Garage" #Replace NA with "No Garage"
+```
+GarageQual(81): According to the description of the dataset from Kaggle, it represents the garage quality, which indicates that it is a categorical variable. Since Na values represent "No Garage", not missing values, the best option to solve this problem is to replace Na values with "No Garage".
+
+```{r}
+df$GarageQual[is.na(df$GarageQual)]="No Garage" #Replace NA with "No Garage"
+```
+
+GarageCond(81): According to the description of the dataset from Kaggle, it represents the garage condition, which indicates that it is a categorical variable. Since Na values represent "No Garage", not missing values, the best option to solve this problem is to replace Na values with "No Garage".
+
+```{r}
+df$GarageCond[is.na(df$GarageCond)]="No Garage" #Replace NA with "No Garage"
+```
+
+PoolQC(1453): According to the description of the dataset from Kaggle, it represents the pool quality, which indicates that it is a categorical variable. Since Na values represent "No Pool", not missing values, the best option is to replace NA with "No Pool"
+
+```{r}
+
+df$PoolQC[is.na(df$PoolQC)]="No Pool" #Replace NA with "No Pool"
+```
+
+Fence(1179):  According to the description of the dataset from Kaggle, it represents the fence quality, which indicates that it is a categorical variable. Since Na values represent "No Fence", not missing values, the best option is to replace NA with "No Fence"
+
+```{r}
+df$Fence[is.na(df$Fence)]="No Fence" #Replace NA with "No Fence"
+```
+
+MiscFeature(1406): According to the description of the dataset from Kaggle, it represents the miscellaneous feature not covered in other categories, which indicates that it is a categorical variable. Since Na values represent "No MixFeature", not missing values, the best option is to replace NA with "None"
+
+```{r}
+df$MiscFeature[is.na(df$MiscFeature)]="None" #Replace NA with "No MiscFeature"
+```
+
+Display the result that there is no NA value in the trainnig set.
+
+```{r,fig.width=20}
+# Create NA_sum dataframe to store the summary of NA values
+NA_sum= as.data.frame(colSums(is.na(df))) 
+# Process the data to feed the ggplot code
+
+colnames(NA_sum) = "Number"
+NA_sum$Variables= row.names(NA_sum)
+NA_sum = NA_sum %>% filter(NA_sum$Number !=0)
+
+#Display the bar plot of the distribution of NA
+ggplot(NA_sum, aes(x= reorder(Variables, -Number), y=Number))+
+  geom_bar(aes(fill= Variables), stat = "identity")+
+  ylab("Number") +
+  xlab("Columns") + 
+  ggtitle("The number of NA values in all columns") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 18, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 15, hjust= 0.5),
+        axis.title.y = element_text(size= 15, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+# EDA
+
+In this section, I am going to identify 5 variables that are correlated with the sales price based on the 5 problems I proposed in the first section by plotting graph and emerging with the specialists' advices.
+
+Beofore starting to answer the question, to extract insight of the dataset is preferred. Since building a model for predicting the sale price of the property in Ames and the NA values have been removed, finding the correlation between SalePrice and each variables is taken into considerations. However, there are 38 numeric variables in this dataset, which makes impossible to use correlation matrix to give a clear view. So, I am going to use bar plot to show the 5 variables with the highest correlation value using cor(). 
+
+```{r, fig.width=10}
+#Extract numeric columns
+df_num= select_if(df, is.numeric)
+#Create a dataset to store the correlation values and the corresponding variables
+
+cor_sum= data.frame( Variables= names(df_num), Values=0)#Assume default value is 0
+
+#Assign correlation value to each row
+for (i in seq(1:length(names(df_num)))) {
+  
+  cor_sum$Values[i]= cor(df_num$SalePrice, df_num[i])
+}
+
+#Extract the 5 variables with top 5 correlation values except SalePrice itself
+cor_sum= cor_sum[order(-cor_sum$Values),] 
+#Only take the first 6 rows including SalePrice itself
+cor_sum= head(cor_sum,6) 
+#Display the bar plot of the correlation values among all numeric variables
+ggplot(cor_sum, aes(x= reorder(Variables, -Values), y=Values))+
+  geom_bar(aes(fill= Values), stat = "identity")+
+  ylab("Correlation Values") +
+  xlab("Variables") + 
+  ggtitle("The first highest 6 correlation values to SalePrice") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 18, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 15, hjust= 0.5),
+        axis.title.y = element_text(size= 15, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+### As we can see from the scatterplot plot matrix, the first row has clearly shows the correlation between those 5 variables and SalePrice. Moreover, the histogram of SalePrice indicates that the distribution is skewed to the right, not symmetric. Log transformation can be applied in the later section.
+```{r,fig.width=15}
+#Create a dataset for creating a scatterplot plot matrix
+ScatterPlot_p= select(df, c("SalePrice","OverallQual", "GrLivArea", "GarageCars", "GarageArea",  "TotalBsmtSF"))
+ggpairs(ScatterPlot_p) 
+
+```
+
+So, as we can see from the graph, the highest numeric correlated variables with Saleprice are OverallQual, GrLivArea, GarageCars, GarageArea and TotalBsmtSF. So this group will be used as one of my model. 
+
+## The first question
+
+First, Identify which suburb/location had the biggest SalePrice by plotting and examining the sale prices cross different suburbs. 
+The reason why I will look at neighborhoods first is that the location of the housing property is one of the most important factor that determines the price of the house. Also, despite of the location, the behaviour of the neighbors around the property can also impact on the price of the property. According to the Appraisal Institute, a bad neighbor could potentially reduce your home’s value up to 10%. It includes neighbors' criminal background, financial level and level of maintainance.(How Your Neighbors Affect Your Property Value, 2021)
+For investigating the relation between neighborhoods and sale price, I plot a boxplot with displaying the mean sales price as the red point and the sort those neighborhoods in descending order by the median. Here are the boxplot. As we can see from the graph, NridgHt has the highest median sale price while MeadowV has the lowest meidan sale price. However, the most popular area are CollgCr, NAmes, Edwards and OldTown. 
+
+In conclusion, it has been clearly showed that neighborhoods has a significant correlation with the sale price supported by some researchs and the relation between sale price and neighborhoods is shown below by box plot.
+As the graph shown, the neighborhoods are sorted by the median of each neighborhoods since the median represents the majority of the price range. The highest one is NridgHT and the lowest one is MeadowV. Also the number of residuals of each group is displayed by the point in grey. The more details will be discuessed on Further Processing section. 
+
+
+```{r,fig.width=20}
+
+#Display boxplot of each neighborhood against sales price with a linear trend
+ggplot(df, aes(x= reorder(Neighborhood, -SalePrice, FUN = median), y=SalePrice))+
+  geom_boxplot(aes(fill= Neighborhood))+
+  geom_jitter(aes(alpha = I(.5)), color="grey")+
+  stat_summary(fun = mean,
+               geom = "point",
+               shape =20,
+               size =3,
+               color = "red",
+               fill = "black") +
+   geom_smooth(method = "lm", se=FALSE, color="blue",lwd=1, aes(group=1))+
+  ylab("Price") +
+  xlab("Neighborhood") + 
+  ggtitle("Box Plot of each neighborhood against sales price") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 18, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 15, hjust= 0.5),
+        axis.title.y = element_text(size= 15, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+```{r, fig.width=20}
+#Display the distribution of Neighborhood 
+ggplot(df, aes(x=Neighborhood, fill=..count..))+
+  geom_bar()+
+  scale_fill_gradient(low="blue", high="green")+
+  ylab("Count") +
+  xlab("OverallQual") +
+  ggtitle("Distribution of OverallQual") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 12, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+## The second question
+
+Second, identify the distribution of GrLivArea against SalePrice.
+The reason why the square feet of the living areas is related to sale price is obvious. In general, the more space for the living area, the more materials are needed which results the higher price. The trend is positive. Also, the neighborhood variables are introduced in this graph. We can see from the graph that nearly all the price ranges are evenly distributed to all neighborhood. However, for NridgHt, this neiborhood is generally higher than the tendency line which match the previous analysis. The distribution of living area against sale price is that the smaller living areas the property has, the smaller price range it tends to get. On the other hand, the larger living area the property has, the larger price range it tends to have. For example, the small living areas less than 1300 are more likely to have a certain price.
+
+```{r,fig.width=15}
+
+#Display boxplot of LotArea against sales price with a linear trend
+ggplot(df,aes(x= reorder( GrLivArea, GrLivArea), y=SalePrice ))+
+  geom_point(aes(color = Neighborhood, alpha = I(.8)))+
+    geom_smooth(method = "lm", se=FALSE, color="blue",lwd=1, aes(group=1))+
+ # scale_color_gradient( low = "navy", high="red")+
+  ylab("Price") +
+  xlab("Living Area") +
+  scale_x_discrete(breaks=seq(0,6000,300))+
+  ggtitle("Box Plot of living area against sales price") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 18, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 15, hjust= 0.5),
+        axis.title.y = element_text(size= 15, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+## The third question
+
+Third, Identify whether there is a corralation between OverallQual and SalePrice?
+It is obvious that the overall quality of material and finish of the house is significantly correlated with sale price. 
+The hypothesis was made: the better materials are used, the higher price will be. According to the graph, the order of the variables is sorted by the median of SalePrice of each OverallQual group. As we can see, the order is in an ascending order which indicates that the higher overall quality the house has, the higher price it tends to be. Also, the number of residuals is shown by the grey points in each group. The graph matches my hypothesis.
+Additional insights can be extracted by the graph as well. The most of the residuals are under OverallQual 5, 6, 7. The distribution of OverallQual is roughly a symmetric distribution shown y the second graph.
+
+  
+```{r,fig.width=15}
+
+#Display boxplot of overall quality against sales price with a linear trend
+ggplot(df, aes(x= reorder(OverallQual, -SalePrice,Fun= median), y=SalePrice))+
+  geom_boxplot()+
+  geom_jitter(aes(alpha = I(.5)), color="grey")+
+  stat_summary(fun = mean,
+               geom = "point",
+               shape =20,
+               size =3,
+               color = "red",
+               fill = "black") +
+  geom_smooth(method = "lm", se=FALSE, color="blue",lwd=1, aes(group=1))+
+  ylab("Price") +
+  xlab("Overall Quality") +
+  ggtitle("Box Plot of overall quality against sales price") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 18, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 15, hjust= 0.5),
+        axis.title.y = element_text(size= 15, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+ 
+```{r}
+#Display the distribution of OverallQual 
+ggplot(df, aes(x=OverallQual, fill=..count..))+
+  geom_bar()+
+  scale_fill_gradient(low="blue", high="green")+
+  scale_x_continuous(breaks= seq(1,10,1))+
+  ylab("Count") +
+  xlab("OverallQual") +
+  ggtitle("Distribution of OverallQual") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 12, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+ 
+## The fourth question 
+Fourth, Identify whether there is a corralation between SaleCondition and SalePrice?
+There are many conditions of sale in housing market. Abnormal sale is usually about family transactions and ignorance of true values and risks (Evans, 2021). Partial is about home is not completed when last assessed. Allocation is about two linked properties with separate deeds, typically condo with a garage unit. Also there is a type of condition of sale is adjoining Land Purchase. Different conditions of sale imply different expectation of the purchas, which indicates the different amount of money. So, investigating the relation between SaleCondition and SalePrice is valuable. 
+As the graph shown, the order of SaleCondition is based on the ranking of the median of SalePrice in an ascending order. It shows what type of condition of sale is more likely to have a higher price. For example, the sale condition is partial is more likely to be higher than the sale condition of normal. However, according to the number of residuals in each group, the most popular condition of sale is normal. the least popular condition of sale is AdjLand.
+```{r,fig.width=15}
+
+#Display boxplot of each sale condition against sales price with a linear trend
+ggplot(df, aes(x= reorder(SaleCondition, -SalePrice,FUN = median), y=SalePrice))+
+  geom_boxplot(aes(fill= SaleCondition))+
+  geom_jitter(aes(alpha = I(.5)), color="grey")+
+  stat_summary(fun = mean,
+               geom = "point",
+               shape =20,
+               size =3,
+               color = "red",
+               fill = "black") +
+  geom_smooth(method = "lm", se=FALSE, color="blue",lwd=1, aes(group=1))+
+  ylab("Price") +
+  xlab("Sale condition") +
+  ggtitle("Box Plot of each sale condition against sales price") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 18, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 15, hjust= 0.5),
+        axis.title.y = element_text(size= 15, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+  
+
+## The fifth question
+
+Fifth, Identify whether there is a corralation between HouseStyle and SalePrice?
+The HouseStyle is the style of dwelling which contains one story, one and one-half story: 2nd level finished, one and one-half story: 2nd level unfinished, two story, two and one-half story: 2nd level finished, two and one-half story: 2nd level unfinished, split Foyer, and	split level. Those differnt dwelling style indicates the information of living areas and possible future expense required. So, it is valuable to investigate the relation between HouseStyle and SalePrice.
+As the graph shown, the order of HouseStyle is based on the ranking of the median of SalePrice in an ascending order. It shows what type of the style of dwelling is more likely to have a higher price. In Ames city, the most popular dwelling styles are 2 story and 1 story.
+
+```{r,fig.width=15}
+
+#Display boxplot of each HouseStyle against sales price with a linear trend
+ggplot(df, aes(x= reorder(HouseStyle, -SalePrice,FUN = median), y=SalePrice))+
+  geom_boxplot(aes(fill= HouseStyle))+
+  geom_jitter(aes(alpha = I(.5)), color="grey")+
+  stat_summary(fun = mean,
+               geom = "point",
+               shape =20,
+               size =3,
+               color = "red",
+               fill = "black") +
+  geom_smooth(method = "lm", se=FALSE, color="blue",lwd=1, aes(group=1))+
+  ylab("Price") +
+  xlab("House Style") +
+  ggtitle("Box Plot of each house style against sales price") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 18, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 15, hjust= 0.5),
+        axis.title.y = element_text(size= 15, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+
+
+# Further processing
+
+This section mainly focuses on further data processing to train the model.
+To summarize the previous section, 5 variables (Neighborhood, LotArea, OverallQual, SaleCondition and HouseStyle) have been demostrated that they are highly correlated with sales price. However, Neighborhood, SaleCondition and HouseStyle are categorial variables that cannot be processed into linear regression model. So those categorical variable should be quantitated to numeric variable. The method for converting categorical variables to quantitative variables is to use zero to represents the category which has the lowest SalePrice. This method will be applied to all categorical variables (Neighborhood, SaleCondition and HouseStyle).
+
+
+## Convert Neighborhood, SaleCondition and HouseStyle to dummy variables
+
+First, I sort the names of the neiborhoods (25 in total) based on the Ascending order. For example, NridgHt got the highest median sales price, so the numeric value for NridgHt will be 24. The lowest sale price is from MeadowV, so the value for it will be 0.
+
+Second, do the same thing for SaleCondition and HouseStyle.
+
+Third, display the same graph from the previous section to see whether the x-axis is in right order.
+
+```{r}
+#Store the order of the categorical values based on the ranking of the median of sale price into differnt group
+Nei_name= c("NridgHt","NoRidge","StoneBr","Timber","Somerst","Veenker","Crawfor","ClearCr","CollgCr","Blmngtn","NWAmes","Gilbert","SawyerW","Mitchel","NPkVill","NAmes","SWISU","Blueste","Sawyer","BrkSide","Edwards","OldTown",  "BrDale","IDOTRR","MeadowV")
+
+Sale_Cond_name= c("Partial","Normal", "Alloca", "Family", "Abnorml", "AdjLand")
+
+HouseS_name= c("2.5Fin", "2Story", "SLvl", "1Story", "SFoyer", "2.5Unf", "1.5Fin", "1.5Unf")
+
+  #Create a copy of df called FP (Further processing)
+  FP= df
+  
+  #Using the for loop to convert categorical variables to numeric variables
+  for (j in seq(1:length(Nei_name))) {
+  #since the name is in ascending order, we need to assign the largest number to the first object.
+  FP$Neighborhood[FP$Neighborhood==Nei_name[j]]= length(Nei_name)-j 
+  }
+  for (j in seq(1:length(Sale_Cond_name))) {
+  #since the name is in ascending order, we need to assign the largest number to the first object.
+  FP$SaleCondition[FP$SaleCondition==Sale_Cond_name[j]]= length(Sale_Cond_name)-j 
+  }
+  
+  for (j in seq(1:length(HouseS_name))) {
+  #since the name is in ascending order, we need to assign the largest number to the first object.
+  FP$HouseStyle[FP$HouseStyle==HouseS_name[j]]= length(HouseS_name)-j 
+  
+
+  }
+  
+```
+
+
+After converting, display the boxplot for neiborhood against saleprice using the same code as the previous section. The x-axis should be from 24 to 0. As the graph shown below, the convertion is completed for neighborhood.
+```{r,fig.width=15}
+
+#Display boxplot of each neighborhood against sales price with a linear trend
+ggplot(FP, aes(x= reorder(Neighborhood, -SalePrice, FUN = median), y=SalePrice))+
+  geom_boxplot(aes(fill=Neighborhood))+
+  geom_jitter(aes(alpha = I(.5)), color="grey")+
+  stat_summary(fun = mean,
+               geom = "point",
+               shape =20,
+               size =3,
+               color = "white",
+               fill = "black") +
+   geom_smooth(method = "lm", se=FALSE, color="blue",lwd=1, aes(group=1))+
+  ylab("Price") +
+  xlab("Neighborhood") + 
+  ggtitle("Box Plot of each neighborhood against sales price") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 12, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+After converting, display the boxplot for SaleCondition against SalePrice using the same code as the previous section. The x-axis should be from 5 to 0. As the graph shown below, the convertion is completed for sale condition.
+
+```{r,fig.width=15}
+
+#Display boxplot of each sale condition against sales price with a linear trend
+ggplot(FP, aes(x= reorder(SaleCondition, -SalePrice,FUN = median), y=SalePrice))+
+  geom_violin(aes(fill= SaleCondition))+
+  geom_jitter(aes(alpha = I(.5)), color="grey")+
+  stat_summary(fun = mean,
+               geom = "point",
+               shape =20,
+               size =3,
+               color = "white",
+               fill = "black") +
+  geom_smooth(method = "lm", se=FALSE, color="blue",lwd=1, aes(group=1))+
+  ylab("Price") +
+  xlab("Sale Condition") +
+  ggtitle("Box Plot of each sale condition against sales price") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 12, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+After converting, display the boxplot for HouseStyle against SalePrice using the same code as the previous section. The x-axis should be from 7 to 0. As the graph shown below, the convertion is completed for house style.
+
+```{r,fig.width=15}
+
+#Display boxplot of each HouseStyle against sales price with a linear trend
+ggplot(FP, aes(x= reorder(HouseStyle, -SalePrice,FUN = median), y=SalePrice))+
+  geom_boxplot(aes(fill= HouseStyle))+
+  geom_jitter(aes(alpha = I(.5)), color="grey")+
+  stat_summary(fun = mean,
+               geom = "point",
+               shape =20,
+               size =3,
+               color = "white",
+               fill = "black") +
+  geom_smooth(method = "lm", se=FALSE, color="blue",lwd=1, aes(group=1))+
+  ylab("Price") +
+  xlab("House Style") +
+  ggtitle("Box Plot of each House style against sales price") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 12, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+### In conclusion, the heat map of my selected variables is shown.
+As the graph shown, in my 5 selected variable, 3 of them have been proved that they have high correlation with SalePrice, but 2 of them which are SaleCondition and HouseStyle are not significantly correlated to SalePrice.
+
+```{r}
+Heat_map= select(FP, c("SalePrice","SaleCondition", "Neighborhood","GrLivArea","HouseStyle","OverallQual"))
+#Convert the categorical data to numeric format so that I can create a heat maps for my selected variables
+Heat_map$Neighborhood= as.numeric(Heat_map$Neighborhood)
+Heat_map$SaleCondition= as.numeric(Heat_map$SaleCondition)
+Heat_map$HouseStyle= as.numeric(Heat_map$HouseStyle)
+#Create Heat map
+ggcorr(Heat_map, name="Correlation", label = T)+
+  ggplot2::labs(title = "Heat Map of My Selected Variables")
+```
+
+
+**After converting those categorical variables, we can start modelling**
+
+# Modeling
+
+In this section, I am going to apply multi-linear model to 
+There are 3 models will be developed to be compared. Here are the variable selections:
+1. The best 5 numeric variables correlated to SalePrice which are OverallQual, GrLivArea, GarageCars, GarageArea and TotalBsmtSF.
+2. The 5 variables I defined in the previous sections which are SaleCondition, Neighborhood, GrLivArea, HouseStyle and OverallQual.
+3. Combine all the variables from model 1 and model 2.
+
+```{r}
+#First model: train linear regression model by the best numeric model
+First_M =lm(SalePrice ~ OverallQual+GrLivArea+GarageCars+GarageArea+TotalBsmtSF  , data= FP)
+#Second model: train linear regression model by Neighborhood, HouseStyle, LotArea, OverallQual, SaleCondition
+Second_M = lm(SalePrice ~ SaleCondition+ Neighborhood+GrLivArea+HouseStyle+OverallQual, data= FP) 
+#Third model: train linear regression model with all variables of model 1 and 2
+Third_M= lm(SalePrice ~SaleCondition+ Neighborhood+GrLivArea+HouseStyle+OverallQual+GarageCars+GarageArea+TotalBsmtSF, data= FP)
+
+
+
+#Display each summary of the model
+summary(First_M) #Adjusted R-squared 0.76
+summary(Second_M)#Adjusted R-squared 0.8051
+summary(Third_M) #Adjusted R-squared 0.8126
+```
+
+As we can see from the result, model 3 is the best model with the R squared value 0.8126.
+**After getting the best model, I am going to optimize the model by using log transformation.**
+First, display the distribution of SalePrice by histogram.
+Second, applying log scale transformation to SalePrice.
+Third, display the distribution of log(SalePrice) by histogram.
+As we can see from the graph, the distribution of log(SalePrice) is much closer to normal distribution. So, using log transformation can actually improve the performance of the model.
+
+```{r}
+#Display histagram of sales price 
+ggplot(FP, aes(x= SalePrice, fill=..count..))+
+  geom_histogram()+
+  scale_fill_gradient(low="blue", high="green")+
+  ylab("Count") +
+  xlab("Sale Price") +
+  ggtitle("Distribution of sales price") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 12, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+```{r}
+#Display histagram of sales price after log transformation
+ggplot(FP, aes(x= log(SalePrice), fill=..count..))+
+  geom_histogram()+
+  scale_fill_gradient(low="blue", high="green")+
+  ylab("Count") +
+  xlab("Sale Price after log transformation") +
+  ggtitle("Distribution of sales price after log transformation") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 12, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+**Appley log transformation to all models**
+As we can see from the result, the R squared value is improved.
+```{r}
+#Scale SalePrice with log()
+FP$LogSalePrice= log(FP$SalePrice)
+#Perform log tranformation to all model
+#First model: train linear regression model by the best numeric model
+First_M =lm(LogSalePrice ~ OverallQual+GrLivArea+GarageCars+GarageArea+TotalBsmtSF  , data= FP)
+#Second model: train linear regression model by Neighborhood, HouseStyle, LotArea, OverallQual, SaleCondition
+Second_M = lm(LogSalePrice ~ SaleCondition+ Neighborhood+GrLivArea+HouseStyle+OverallQual, data= FP) 
+#Third model: train linear regression model with all variables of model 1 and 2
+Third_M= lm(LogSalePrice ~SaleCondition+ Neighborhood+GrLivArea+HouseStyle+OverallQual+GarageCars+GarageArea+TotalBsmtSF, data= FP)
+
+summary(First_M) #Adjusted R-squared 0.7931 where the original one is 0.76
+summary(Second_M)#Adjusted R-squared 0.8309 where the original one is 0.8051
+summary(Third_M) #Adjusted R-squared 0.8453 where the original one is 0.8126
+```
+
+# Evaluation
+
+This section will maily focus on cleaning the test dataset and then evaluate the performance of my models. However, before using the models to predict, cleaning the test dataset and convert the targeting categorical variables to numeric variables are preferred, otherwise the model cannot predict the test dataset.
+
+Here is the code for cleaning the NA values of test dataset.
+**First, import the test data.**
+
+```{r}
+ts= read.csv(file.choose(), header=TRUE) #Import data to testing_set
+```
+
+**Second, display the summary of NA values in test dataset**
+As the graph shown, there are 33 variables contained NA values. So I am going to handle them one by one based on the description of the data.
+```{r,fig.width=30}
+# Create NA_sum dataframe to store the summary of NA values
+NA_sum_ts= as.data.frame(colSums(is.na(ts))) 
+# Process the data to feed the ggplot code
+
+colnames(NA_sum_ts) = "Number"
+NA_sum_ts$Variables= row.names(NA_sum_ts)
+NA_sum_ts = NA_sum_ts %>% filter(NA_sum_ts$Number !=0)
+
+#Display the bar plot of the distribution of NA
+ggplot(NA_sum_ts, aes(x= reorder(Variables, -Number), y=Number))+
+  geom_bar(aes(fill= Variables), stat = "identity")+
+  ylab("Number") +
+  xlab("Columns") + 
+  ggtitle("The number of NA values in all columns") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 32, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 20, hjust= 0.5),
+        axis.title.y = element_text(size= 20, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+**Third, start cleaning the NA values**
+**Finally, display the summary of NA values by matrix**
+```{r}
+ts$LotFrontage[is.na(ts$LotFrontage)]=0 #Replace NA with 0
+ts$Alley[is.na(ts$Alley)]="NO" #Replace NA with "NO"
+
+ts=ts[!is.na(ts$MasVnrType), ]
+
+ts$BsmtCond[is.na(ts$BsmtCond)]="No Basement" #Replace NA with "No Basement"
+ts$BsmtQual[is.na(ts$BsmtQual)]="No Basement" #Replace NA with "No Basement"
+
+ts$BsmtExposure[is.na(ts$BsmtExposure)]="No Basement" #Replace NA with "No Basement"
+
+ts$BsmtFinType1[is.na(ts$BsmtFinType1)]="No Basement" #Replace NA with "No Basement"
+
+ts$BsmtFinType2[is.na(ts$BsmtFinType2)]="No Basement" #Replace NA with "No Basement"
+
+ts$FireplaceQu[is.na(ts$FireplaceQu)]="No Fireplace" #Replace NA with "No Fireplace"
+
+ts$GarageType[is.na(ts$GarageType)]="No Garage" #Replace NA with "No Garage"
+
+ts$GarageYrBlt[is.na(ts$GarageYrBlt)]=0 #Replace NA with zero since this column is integer type
+
+ts$GarageFinish[is.na(ts$GarageFinish)]="No Garage" #Replace NA with "No Garage"
+
+ts$GarageQual[is.na(ts$GarageQual)]="No Garage" #Replace NA with "No Garage"
+
+ts$GarageCond[is.na(ts$GarageCond)]="No Garage" #Replace NA with "No Garage"
+
+ts$PoolQC[is.na(ts$PoolQC)]="No Pool" #Replace NA with "No Pool"
+
+ts$Fence[is.na(ts$Fence)]="No Fence" #Replace NA with "No Fence"
+
+ts$MiscFeature[is.na(ts$MiscFeature)]="None" #Replace NA with "No MiscFeature"
+
+# The codes below are to remove all the rows with NA values since those values are missing
+ts=ts[!is.na(ts$MasVnrType), ]
+
+ts=ts[!is.na(ts$BsmtUnfSF), ]
+
+ts=ts[!is.na(ts$BsmtHalfBath), ]
+
+ts=ts[!is.na(ts$BsmtFullBath), ]
+
+ts=ts[!is.na(ts$MSZoning), ]
+
+ts=ts[!is.na(ts$KitchenQual), ]
+
+ts=ts[!is.na(ts$Functional), ]
+
+ts=ts[!is.na(ts$GarageCars), ]
+
+ts=ts[!is.na(ts$SaleType), ]
+
+ts=ts[!is.na(ts$Exterior1st), ]
+
+ts=ts[!is.na(ts$Utilities), ]
+
+#show the NA values 
+colSums(is.na(ts))
+```
+**So, there are no NA values in test dataset.**
+
+## Converting categorical variables to numeric variables
+
+In this subsection, it mainly focuses on converting the targeted categorical variables to numeric variables same as the way where training data was processed. 
+
+```{r}
+#Using the for loop to convert categorical variables to numeric variables
+  for (j in seq(1:length(Nei_name))) {
+  #since the name is in ascending order, we need to assign the largest number to the first object.
+  ts$Neighborhood[ts$Neighborhood==Nei_name[j]]= length(Nei_name)-j 
+  }
+  for (j in seq(1:length(Sale_Cond_name))) {
+  #since the name is in ascending order, we need to assign the largest number to the first object.
+  ts$SaleCondition[ts$SaleCondition==Sale_Cond_name[j]]= length(Sale_Cond_name)-j 
+  }
+  
+  for (j in seq(1:length(HouseS_name))) {
+  #since the name is in ascending order, we need to assign the largest number to the first object.
+  ts$HouseStyle[ts$HouseStyle==HouseS_name[j]]= length(HouseS_name)-j 
+  
+  
+  }
+
+```
+
+# Prediction
+
+In this section, I will apply my best model to predict the test dataset and evaluate the prediction result by RMSE.
+In conclusion, the best RMSE is 0.1534255 and the graph visualize the accuracy of the model. The detials of finding will be presented in the next section.
+```{r, fig.width=10}
+#Convert ts$Saleprice to log scale
+ts$LogSalePrice= log(ts$SalePrice)
+
+#Make prediction with the forth model
+ts$Prediction1= predict(First_M,ts)
+ts$Prediction2= predict(Second_M,ts)
+ts$Prediction3= predict(Third_M,ts)
+
+#Calculate RMSE
+rmse(ts$LogSalePrice, ts$Prediction1) #RMSE is 0.1726761
+rmse(ts$LogSalePrice, ts$Prediction2) #RMSE is 0.1600108
+rmse(ts$LogSalePrice, ts$Prediction3) #RMSE is 0.1534255
+
+#Result of the first model
+ggplot(ts,aes(x=LogSalePrice, y=Prediction1))+
+  geom_point()+
+  geom_abline( slope = 1, intercept = 0, color="blue" ,lwd=1)+
+  scale_x_continuous(limits=c(9,14))+
+  scale_y_continuous(limits=c(9,14))+
+  ylab("Actual") +
+  xlab("Prediction using First Model") + 
+  ggtitle("Result of the first model") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 16, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+#Result of the second model
+ggplot(ts,aes(x=LogSalePrice, y=Prediction1))+
+  geom_point()+
+  geom_abline( slope = 1, intercept = 0, color="blue" ,lwd=1)+
+  scale_x_continuous(limits=c(9,14))+
+  scale_y_continuous(limits=c(9,14))+
+  ylab("Actual") +
+  xlab("Prediction using Second Model") + 
+  ggtitle("Result of the Second model") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 16, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+#Result of the third model
+ggplot(ts,aes(x=LogSalePrice, y=Prediction1))+
+  geom_point()+
+  geom_abline( slope = 1, intercept = 0, color="blue" ,lwd=1)+
+  scale_x_continuous(limits=c(9,14))+
+  scale_y_continuous(limits=c(9,14))+
+  ylab("Actual") +
+  xlab("Prediction using Third Model") + 
+  ggtitle("Result of the Third model") +
+  theme_classic()+
+  theme(plot.title = element_text(size= 16, face= "bold", hjust= 0.5),
+        axis.title.x = element_text(size= 10, hjust= 0.5),
+        axis.title.y = element_text(size= 10, hjust= 0.5),
+        axis.ticks = element_blank())
+
+```
+
+# Recommendation and findings
+In conclusion, firstly, I extracted the 5 variables with the highest correlation to SalePrice and then add them as my first model. Second, I selected 5 variables that could be the highest correlation to SalePrice by getting advices from the professionals and research and then, add them as my second model. For my third model, I combine the first model's variables and the second model's variables together to create my third models. The R squared value of each model were calculated where the third model is considered as the best model. Since in the EDA section, I have spotted that the distribution of SalePrice was not a normal distribution. So, I apply log transformation to make a log normal distribution for SalePrice to optimize the performance of the models. Then, I trained all 3 models with the log-scale SalePrice. The significant improvement can be seen and I have stated in the previous section. Finally, I applied all the models to test dataset after it have been preprocessed. The best model is still the third model which contains all highest 5 numeric variables and my selected variables. The best model has roughly 0.85 R square value. 
+
+The models definitely could provide an estimation for all investor who is interested in Ames housing market. Except the prediction model, some insteresting findings are also spotted in the previous section. For instance, the most populor house styles are one story and 2 story, so the investors are encouraged to invest the house with these 2 styles. Also, for the neiborhood, the location is one of the most important factor of the property. NridgHt has the highest median sale price while MeadowV has the lowest meidan sale price. However, the most popular area are CollgCr, NAmes, Edwards and OldTown. The investors are suggested to invest CollgCr since the price range of CollgCr and the popularity of CollgCr are both high. For the sale condition, the most popular sale condition is normal, but it only at the second place in terms of the sale price. The sale condition partial took the first place and the median of the sale price is much geater than the sale condition normal, but it is much less popular to the sale condition normal. The investor should consider their own situations to decide which sale condition they should apply. For the ovreall quality, the additional insights were extracted. The most common OverallQual are 5, 6, 7. The distribution of OverallQual is roughly a symmetric distribution. For living area, the distribution of living area against sale price is that the smaller living areas the property has, the smaller price range it tends to get. On the other hand, the larger living area the property has, the larger price range it tends to have. For example, the small living areas less than 1300 are more likely to have a certain price.
+
+However, for my selected variables, 3 of them have been proved that they have high correlation with SalePrice, but 2 of them which are SaleCondition and HouseStyle are not significantly correlated to SalePrice. I was overestimate the correlation of HouseStyle and SalesCondition where they only has around 0.3 correlation value to the price. So, the further work can be finding another 2 better variables to optimzie the models such as the year built and other categorical variables. 
+
+
+
+# Reference
+Pettinger, T., 2021. Definition of the housing market - Economics Help. [online] Economics Help. Available at: <https://www.economicshelp.org/blog/glossary/definition-of-the-housing-market/> [Accessed 1 May 2021].
+
+Evans, D., 2021. abnormal sale. [online] TheFreeDictionary.com. Available at: <https://financial-dictionary.thefreedictionary.com/abnormal+sale> [Accessed 7 May 2021].
+
+Sarafian, R., 2021. House Price Prediction. [online] Rstudio-pubs-static.s3.amazonaws.com. Available at: <https://rstudio-pubs-static.s3.amazonaws.com/247652_bb5c001d6f7642d88f9ff66ecf1e28a3.html?fbclid=IwAR0oNc8USLIStQgoaMAq7vYX4cUHgJCZ46o9FQZP12I5SzDeT2E9cbsHO5Q> [Accessed 12 May 2021].
+
+StatCanada, 2021. Dwelling type of dwelling. [online] Www23.statcan.gc.ca. Available at: <https://www23.statcan.gc.ca/imdb/p3Var.pl?Function=DEC&Id=323163> [Accessed 5 May 2021].
+
+Ames Gov, 2021. Reports | City of Ames, IA. [online] Cityofames.org. Available at: <https://www.cityofames.org/government/departments-divisions-a-h/city-assessor/reports> [Accessed 5 May 2021].
+
+Ames Mayor John Haila, 2021. [online] Cityofames.org. Available at: <https://www.cityofames.org/home/showpublisheddocument/61546/637552045376700000> [Accessed 12 May 2021].
